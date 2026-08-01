@@ -1,0 +1,130 @@
+// ============================================================================
+// LSF Segment-Based Train Seat Booking — Data Model
+//
+// Design summary (full reasoning goes in the repo README):
+//
+// - Station.sequence gives every station a 0-based position along the route.
+//   A "leg" is the stretch of track between sequence i and i+1. A journey
+//   from station A (seq 2) to station B (seq 5) occupies legs [2,3,4].
+//
+// - Trip represents one scheduled run of the route on a specific date, so
+//   seat availability naturally resets day to day (a real train timetable,
+//   not one eternal journey).
+//
+// - Occupancy is tracked per-leg via BookedLeg, one row per (trip, seat, leg).
+//   A unique constraint on (tripId, seatId, legIndex) is what actually
+//   guarantees correctness: booking a range means inserting one row per leg
+//   in that range inside a single DB transaction. If any leg is already
+//   taken, the unique constraint violation aborts the whole transaction and
+//   the caller gets a clean 409 Conflict — no manual locking, no read-then-
+//   write race window. Postgres enforces the invariant, not application code.
+//
+//   (Alternative considered: a bitmask column per seat/trip with an atomic
+//   `UPDATE ... WHERE (mask & range) = 0`. Faster in theory, but harder to
+//   query "which legs are free" and harder to explain/debug. Went with the
+//   normalized per-leg row approach for clarity and because Postgres's
+//   unique-constraint + transaction combo already gives us exactly the
+//   correctness guarantee we need.)
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CoachType {
+  RESERVED
+  UNRESERVED
+}
+
+model Station {
+  id       Int    @id @default(autoincrement())
+  code     String @unique // e.g. "COL", "KDY", "BDL"
+  name     String
+  sequence Int    @unique // 0-based order along the Colombo Fort -> Badulla route
+
+  originBookings      SeatBooking[] @relation("OriginStation")
+  destinationBookings SeatBooking[] @relation("DestinationStation")
+
+  @@map("stations")
+}
+
+model Coach {
+  id        Int       @id @default(autoincrement())
+  code      String    @unique // e.g. "R1", "R2", "U1"
+  type      CoachType
+  seatCount Int
+  seats     Seat[]
+
+  @@map("coaches")
+}
+
+model Seat {
+  id         Int    @id @default(autoincrement())
+  coachId    Int
+  coach      Coach  @relation(fields: [coachId], references: [id])
+  seatNumber Int
+
+  bookings   SeatBooking[]
+  bookedLegs BookedLeg[]
+
+  @@unique([coachId, seatNumber])
+  @@map("seats")
+}
+
+// One scheduled run of the route (e.g. 2026-08-10 Colombo Fort -> Badulla).
+// Only RESERVED-coach seats are tracked for booking; unreserved coaches are
+// out of scope for seat-level booking per the assignment.
+model Trip {
+  id        Int      @id @default(autoincrement())
+  date      DateTime @db.Date
+  routeName String   @default("Colombo Fort - Badulla")
+  createdAt DateTime @default(now())
+
+  bookings   SeatBooking[]
+  bookedLegs BookedLeg[]
+
+  @@unique([date, routeName])
+  @@map("trips")
+}
+
+model SeatBooking {
+  id     Int  @id @default(autoincrement())
+  tripId Int
+  trip   Trip @relation(fields: [tripId], references: [id])
+  seatId Int
+  seat   Seat @relation(fields: [seatId], references: [id])
+
+  originStationId      Int
+  originStation        Station @relation("OriginStation", fields: [originStationId], references: [id])
+  destinationStationId Int
+  destinationStation   Station @relation("DestinationStation", fields: [destinationStationId], references: [id])
+
+  passengerName String
+  fare          Decimal  @db.Decimal(10, 2)
+  createdAt     DateTime @default(now())
+
+  legs BookedLeg[]
+
+  @@map("seat_bookings")
+}
+
+// One row per occupied leg of a booking. This table is the concurrency
+// control mechanism — see the header comment above.
+model BookedLeg {
+  id            Int         @id @default(autoincrement())
+  tripId        Int
+  trip          Trip        @relation(fields: [tripId], references: [id])
+  seatId        Int
+  seat          Seat        @relation(fields: [seatId], references: [id])
+  legIndex      Int
+  seatBookingId Int
+  seatBooking   SeatBooking @relation(fields: [seatBookingId], references: [id], onDelete: Cascade)
+
+  @@unique([tripId, seatId, legIndex])
+  @@map("booked_legs")
+}

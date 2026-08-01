@@ -1,0 +1,26 @@
+{
+  "routeName": "Colombo Fort - Badulla",
+  "stations": [
+    { "code": "COL", "name": "Colombo Fort" },
+    { "code": "RGM", "name": "Ragama" },
+    { "code": "GMP", "name": "Gampaha" },
+    { "code": "PRD", "name": "Peradeniya" },
+    { "code": "KDY", "name": "Kandy" },
+    { "code": "HTN", "name": "Hatton" },
+    { "code": "NNO", "name": "Nanu Oya" },
+    { "code": "HPT", "name": "Haputale" },
+    { "code": "ELA", "name": "Ella" },
+    { "code": "BDL", "name": "Badulla" }
+  ],
+  "farePerLeg": 150.0,
+  "coaches": [
+    { "code": "R1", "type": "RESERVED", "seatCount": 40 },
+    { "code": "R2", "type": "RESERVED", "seatCount": 40 },
+    { "code": "R3", "type": "RESERVED", "seatCount": 40 },
+    { "code": "U1", "type": "UNRESERVED", "seatCount": 0 },
+    { "code": "U2", "type": "UNRESERVED", "seatCount": 0 },
+    { "code": "U3", "type": "UNRESERVED", "seatCount": 0 },
+    { "code": "U4", "type": "UNRESERVED", "seatCount": 0 },
+    { "code": "U5", "type": "UNRESERVED", "seatCount": 0 }
+  ]
+}

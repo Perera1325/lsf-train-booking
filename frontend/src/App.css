@@ -1,0 +1,256 @@
+:root {
+  --green-900: #0b3d2e;
+  --green-700: #0e6b4f;
+  --green-500: #14a878;
+  --green-100: #e3f5ee;
+  --sand-50: #faf8f3;
+  --ink: #1c2422;
+  --ink-soft: #5c6b66;
+  --border: #dbe4e0;
+  --danger: #c0392b;
+  --danger-bg: #fdecea;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--sand-50);
+  color: var(--ink);
+}
+
+.app {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 4rem;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.app-header h1 {
+  font-size: 1.75rem;
+  margin: 0 0 0.25rem;
+  color: var(--green-900);
+}
+
+.app-header p {
+  margin: 0 0 2rem;
+  color: var(--ink-soft);
+}
+
+.panel {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.panel h2 {
+  margin: 0 0 1rem;
+  font-size: 1.05rem;
+  color: var(--green-900);
+}
+
+.route-form {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1;
+  min-width: 160px;
+}
+
+.field label {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+select,
+input[type="text"] {
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  font-size: 0.95rem;
+  background: white;
+  color: var(--ink);
+}
+
+select:focus,
+input:focus {
+  outline: 2px solid var(--green-500);
+  outline-offset: 1px;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 0.6rem 1.1rem;
+  transition: opacity 0.15s ease;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--green-700);
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.seat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+}
+
+.seat-card {
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  padding: 0.6rem 0.4rem;
+  text-align: center;
+  cursor: pointer;
+  background: var(--green-100);
+  transition: border-color 0.12s ease, transform 0.08s ease;
+}
+
+.seat-card:hover {
+  transform: translateY(-1px);
+}
+
+.seat-card.selected {
+  border-color: var(--green-700);
+  background: var(--green-500);
+  color: white;
+}
+
+.seat-card .coach {
+  font-size: 0.7rem;
+  opacity: 0.75;
+  display: block;
+}
+
+.seat-card .num {
+  font-size: 1.1rem;
+  font-weight: 700;
+  display: block;
+}
+
+.coach-group {
+  margin-bottom: 1rem;
+}
+
+.coach-group h3 {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  margin: 0 0 0.4rem;
+}
+
+.empty-state {
+  color: var(--ink-soft);
+  padding: 1rem 0;
+  font-size: 0.9rem;
+}
+
+.alert {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.alert-error {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: 1px solid #f3c8c3;
+}
+
+.alert-success {
+  background: var(--green-100);
+  color: var(--green-900);
+  border: 1px solid #bfe6d5;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+}
+
+th {
+  color: var(--ink-soft);
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.tab {
+  background: white;
+  border: 1px solid var(--border);
+  color: var(--ink-soft);
+}
+
+.tab.active {
+  background: var(--green-700);
+  color: white;
+  border-color: var(--green-700);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
+}
+
+.stat-card {
+  background: var(--green-100);
+  border-radius: 10px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.stat-label {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--green-900);
+}

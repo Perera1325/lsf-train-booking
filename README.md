@@ -1,13 +1,10 @@
 # LSF Train Booking — Segment-Based Seat Booking System
 
-A booking system for the Colombo Fort–Badulla line that lets a single
-reserved seat be booked independently for multiple, non-overlapping legs of
-the same journey (e.g. one passenger travels Colombo Fort → Kandy, another
-takes Kandy → Badulla, same physical seat, each charged only for the
-distance they actually travel).
-
-> **Status:** Work in progress, built in stages. See commit history for
-> progression. This README is updated at the end of each stage.
+A booking system for the Colombo Fort–Badulla scenic line that lets a
+single reserved seat be booked independently for multiple, non-overlapping
+legs of the same journey — e.g. one passenger travels Colombo Fort → Kandy
+and another takes Kandy → Badulla on the exact same physical seat, each
+paying only for the distance they actually travel.
 
 ## Quick start
 
@@ -16,19 +13,20 @@ cp backend/.env.example backend/.env
 docker compose up --build
 ```
 
+- Frontend (booking UI): http://localhost:5173
 - Backend API: http://localhost:4000
-- Frontend: http://localhost:5173
 - Postgres: localhost:5432 (user `lsf`, password `lsf_dev_password`, db `lsf_booking`)
 
-On first boot the backend runs pending migrations and seeds the database
-from `backend/config/route.json` (stations, coaches, seats, fare-per-leg —
-see "Configurability" below).
+On first boot the backend applies the committed Prisma migration and seeds
+the database from `backend/config/route.json` (stations, coaches, seats,
+fare-per-leg).
 
 ## Tech stack
 
 - **Backend:** Node.js, TypeScript, Express, Prisma ORM
 - **Frontend:** React, TypeScript, Vite
 - **Database:** PostgreSQL
+- **Testing:** Vitest (integration tests against the real DB)
 - **Orchestration:** Docker Compose
 
 ## Core design decisions
@@ -43,22 +41,28 @@ Occupancy is tracked in a `booked_legs` table: **one row per (trip, seat,
 leg)**, with a unique constraint on `(tripId, seatId, legIndex)`.
 
 To book a seat for a range of stations, the backend opens a single database
-transaction and inserts one `BookedLeg` row per leg in that range. If any of
-those legs is already taken, the unique constraint throws, the whole
-transaction rolls back, and the caller gets a `409 Conflict`. No seat is
-ever double-booked, and no application-level locking code is needed —
-correctness is enforced by the database itself.
+transaction, creates the `SeatBooking` row, then inserts one `BookedLeg`
+row per leg in that range. If any of those legs is already taken, the
+unique constraint throws, the whole transaction rolls back (including the
+`SeatBooking` row), and the caller gets a `409 Conflict`. No seat is ever
+double-booked, and there's no application-level locking code — correctness
+is enforced by the database itself, not by careful sequencing in JS.
 
-**Alternative considered — bitmask per (seat, trip):** store occupancy as an
-integer/bit-string per seat and do an atomic
-`UPDATE ... SET mask = mask | :range WHERE (mask & :range) = 0`. This is a
-single round-trip and avoids N row inserts, but it's harder to query
-("which legs are free right now?" needs bit-unpacking instead of a plain
-`WHERE` clause), harder to debug, and doesn't scale cleanly if the route
-gains stations beyond a fixed integer width. The normalized-row approach
-trades a little write throughput for a model that's transparent, easy to
-query, and easy to explain in a live walkthrough — the right trade for this
-system's actual load (a train schedule, not a high-frequency exchange).
+**Proof, not just a claim:** `backend/scripts/concurrency-test.ts` fires 10
+simultaneous booking requests at the same seat/segment against the running
+API. Result every time: exactly 1 succeeds, 9 get `409`. The same guarantee
+is also covered by an automated test (`backend/src/services/booking.test.ts`)
+that fires 8 concurrent requests directly against the service layer.
+
+**Alternative considered — bitmask per (seat, trip):** store occupancy as
+an integer/bit-string per seat and do an atomic
+`UPDATE ... SET mask = mask | :range WHERE (mask & :range) = 0`. Faster in
+theory (one row, one round trip) but harder to query ("which legs are free
+right now?" needs bit-unpacking instead of a plain `WHERE`), harder to
+debug, and doesn't scale cleanly if the route grows past a fixed integer
+width. The normalized-row approach trades a little write throughput for a
+model that's transparent, queryable, and easy to explain live — the right
+trade for a train schedule's actual load, not a high-frequency exchange.
 
 ### 2. Trips are date-scoped
 
@@ -81,27 +85,84 @@ resellable per-segment. Unreserved coaches are first-come-first-served with
 no seat assignment, so they're modeled as coaches (for completeness/future
 capacity reporting) but have no `Seat` rows and no booking flow.
 
-### 5. Schema sync via `prisma db push` (for now)
+### 5. Schema managed via a committed Prisma migration
 
-The container currently boots with `prisma db push` rather than versioned
-`prisma migrate` files, since generating a migration requires a live DB
-connection at dev time. Once the schema is stable (end of Stage 2), this
-will be replaced with a proper `migrate dev`-generated migration checked
-into the repo, and the Dockerfile switched to `migrate deploy` — the
-correct approach for a real deployment.
+The project started with `prisma db push` for fast iteration during early
+development, then moved to a proper `prisma migrate dev`-generated
+migration (checked into `backend/prisma/migrations/`) once the schema
+stabilized, with the container now running `prisma migrate deploy` on
+boot — the standard, reproducible way to apply schema changes in any
+environment.
 
-## Concurrency guarantee
+## API reference
 
-Documented in detail with the booking endpoint in Stage 2, including the
-approach used to test it (parallel requests racing for the same seat/leg).
+| Method | Path                              | Description                                      |
+|--------|-----------------------------------|---------------------------------------------------|
+| GET    | `/health`                         | DB connectivity check                              |
+| GET    | `/stations`                       | List all stations in route order                   |
+| GET    | `/trips`                          | List scheduled trips                                |
+| GET    | `/trips/:tripId/availability`     | `?origin=CODE&destination=CODE` — free seats for that segment |
+| GET    | `/trips/:tripId/bookings`         | List all bookings for a trip                        |
+| GET    | `/trips/:tripId/stats`            | Revenue and occupancy stats for a trip               |
+| POST   | `/trips/:tripId/bookings`         | Book a seat: `{ seatId, originStationCode, destinationStationCode, passengerName }` |
 
-## Project stages
+## Testing
 
-1. **Foundations & design** (this commit) — repo scaffold, data model, docker-compose
-2. Backend core: stations, seats, segment availability, booking engine
-3. Fare logic, validation, concurrency tests
+```bash
+docker compose exec backend npm test              # automated integration tests
+docker compose exec backend npm run test:concurrency   # manual concurrency proof against the live API
+```
+
+Tests run against the real Postgres instance (not mocks) since the system's
+entire correctness guarantee lives in the database's unique constraint —
+mocking it would test nothing meaningful.
+
+## Extra credit implemented
+
+- **Admin view** (`/trips/:tripId/stats` + the "Admin" tab in the UI):
+  total bookings, total revenue, and seat-leg occupancy percentage for a
+  trip.
+- **Graceful conflict UX:** if a booking request 409s because someone else
+  took an overlapping leg between the user's availability check and their
+  click, the UI shows a clear error and automatically refreshes the seat
+  grid rather than leaving a stale, unbookable seat on screen.
+
+## Extra credit considered but not built
+
+Per the assignment's own guidance ("a focused, well-reasoned core beats an
+impressive list of extras"), these were scoped out to keep the core solid:
+
+- **Seat map visualization** (a literal train-carriage diagram) — the seat
+  grid UI already conveys availability by coach/seat number; a visual
+  floor-plan would be a nice-to-have polish item, not core value.
+- **Waitlisting for full segments** — meaningfully changes the data model
+  (needs a queue + notification concept) and felt like scope creep for the
+  time available.
+
+## Challenges faced
+
+- **Prisma + Alpine Linux/OpenSSL:** `node:20-alpine` doesn't ship OpenSSL
+  by default, which broke Prisma's query engine at container startup with a
+  garbled error message. Fixed by installing `openssl` in the Dockerfile
+  and explicitly setting `binaryTargets = ["native", "linux-musl-openssl-3.0.x"]`
+  in `schema.prisma`.
+- **Concurrency correctness under real parallel load:** the design
+  decision to use a unique constraint on `(tripId, seatId, legIndex)` was
+  validated empirically, not just reasoned about — the concurrency test
+  script and the automated Vitest suite both fire many simultaneous
+  requests at the same seat and assert exactly one wins.
+- **Migrating from prototyping to a committed migration:** started with
+  `prisma db push` for speed, then generated a proper `prisma migrate dev`
+  migration once the schema was stable, switching the container's boot
+  command to `migrate deploy` to match how a real deployment would work.
+
+## Project stages (see commit history for full progression)
+
+1. Foundations & design — repo scaffold, data model, docker-compose
+2. Backend core — stations, availability, transactional booking engine
+3. Fare logic, input hardening, automated + concurrency tests
 4. Frontend booking UI
-5. Productionizing, extra credit, submission polish
+5. Production migration, admin extra credit, final polish
 
 ## Repository
 

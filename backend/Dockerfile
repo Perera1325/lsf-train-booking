@@ -14,4 +14,4 @@ COPY . .
 
 EXPOSE 4000
 
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && npm run seed && npm run dev"]
+CMD ["sh", "-c", "npx prisma migrate deploy && npm run seed && npm run dev"]

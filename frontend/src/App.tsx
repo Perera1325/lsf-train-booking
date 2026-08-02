@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import "./App.css";
+import Hero from "./Hero";
+import LiveClockWeather from "./LiveClockWeather";
 import AdminPanel from "./AdminPanel";
 import {
   Station,
@@ -132,10 +134,18 @@ export default function App() {
 
   return (
     <div className="app">
-      <header className="app-header">
-        <h1>LSF Train Booking</h1>
-        <p>Colombo Fort → Badulla — book a reserved seat for exactly the segment you're travelling.</p>
-      </header>
+      <nav className="navbar">
+        <span className="navbar-logo">LSF <strong>Rail</strong></span>
+        <LiveClockWeather />
+      </nav>
+      {activeTab === "book" ? (
+        <Hero />
+      ) : (
+        <header className="app-header visible">
+          <h1>LSF Train Booking</h1>
+          <p>Admin dashboard — revenue and occupancy.</p>
+        </header>
+      )}
 
       <div className="tabs">
         <button className={`tab${activeTab === "book" ? " active" : ""}`} onClick={() => setActiveTab("book")}>
@@ -283,6 +293,7 @@ export default function App() {
               </table>
             )}
           </section>
+
         </>
       )}
     </div>

@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../db";
 import { AppError } from "../errors";
 import { getStationByCode } from "./stations";
+import { getTripOrThrow } from "./trips";
 import { getRouteConfig } from "../config-loader";
 
 export interface AvailableSeat {
@@ -40,9 +41,13 @@ export async function getAvailability(
   originCode: string,
   destinationCode: string
 ): Promise<AvailableSeat[]> {
+  await getTripOrThrow(tripId);
   const { origin, destination } = await resolveAndValidateRoute(originCode, destinationCode);
   const legs = legRange(origin.sequence, destination.sequence);
 
+  // Fetch every reserved-coach seat along with any bookings it already has
+  // that overlap the requested leg range. A seat with zero overlapping
+  // BookedLeg rows is free for this exact range.
   const seats = await prisma.seat.findMany({
     where: { coach: { type: "RESERVED" } },
     include: {
@@ -71,6 +76,7 @@ export async function createBooking(params: {
   passengerName: string;
 }) {
   const { tripId, seatId, originCode, destinationCode, passengerName } = params;
+  await getTripOrThrow(tripId);
   const { origin, destination } = await resolveAndValidateRoute(originCode, destinationCode);
 
   const seat = await prisma.seat.findUnique({ where: { id: seatId }, include: { coach: true } });

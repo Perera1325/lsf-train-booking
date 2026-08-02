@@ -1,23 +1,31 @@
 import { Router } from "express";
 import { z } from "zod";
-import { prisma } from "../db";
 import { getAvailability, createBooking } from "../services/booking";
+import { listTrips, listBookingsForTrip } from "../services/trips";
 import { AppError } from "../errors";
 
 export const tripsRouter = Router();
 
 tripsRouter.get("/", async (_req, res, next) => {
   try {
-    const trips = await prisma.trip.findMany({ orderBy: { date: "asc" } });
+    const trips = await listTrips();
     res.json(trips);
   } catch (err) {
     next(err);
   }
 });
 
+// Trims and uppercases station codes so "kdy", " KDY ", "Kdy" all resolve
+// the same way instead of failing validation on trivial formatting.
+const stationCodeSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .transform((s) => s.toUpperCase());
+
 const availabilityQuerySchema = z.object({
-  origin: z.string().min(1),
-  destination: z.string().min(1),
+  origin: stationCodeSchema,
+  destination: stationCodeSchema,
 });
 
 tripsRouter.get("/:tripId/availability", async (req, res, next) => {
@@ -33,11 +41,23 @@ tripsRouter.get("/:tripId/availability", async (req, res, next) => {
   }
 });
 
+tripsRouter.get("/:tripId/bookings", async (req, res, next) => {
+  try {
+    const tripId = Number(req.params.tripId);
+    if (Number.isNaN(tripId)) throw new AppError(400, "Invalid tripId");
+
+    const bookings = await listBookingsForTrip(tripId);
+    res.json(bookings);
+  } catch (err) {
+    next(err);
+  }
+});
+
 const createBookingSchema = z.object({
   seatId: z.number().int().positive(),
-  originStationCode: z.string().min(1),
-  destinationStationCode: z.string().min(1),
-  passengerName: z.string().min(1).max(120),
+  originStationCode: stationCodeSchema,
+  destinationStationCode: stationCodeSchema,
+  passengerName: z.string().trim().min(1).max(120),
 });
 
 tripsRouter.post("/:tripId/bookings", async (req, res, next) => {

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { getAvailability, createBooking } from "../services/booking";
 import { listTrips, listBookingsForTrip } from "../services/trips";
+import { getTripStats } from "../services/stats";
 import { AppError } from "../errors";
 
 export const tripsRouter = Router();
@@ -15,8 +16,6 @@ tripsRouter.get("/", async (_req, res, next) => {
   }
 });
 
-// Trims and uppercases station codes so "kdy", " KDY ", "Kdy" all resolve
-// the same way instead of failing validation on trivial formatting.
 const stationCodeSchema = z
   .string()
   .trim()
@@ -48,6 +47,18 @@ tripsRouter.get("/:tripId/bookings", async (req, res, next) => {
 
     const bookings = await listBookingsForTrip(tripId);
     res.json(bookings);
+  } catch (err) {
+    next(err);
+  }
+});
+
+tripsRouter.get("/:tripId/stats", async (req, res, next) => {
+  try {
+    const tripId = Number(req.params.tripId);
+    if (Number.isNaN(tripId)) throw new AppError(400, "Invalid tripId");
+
+    const stats = await getTripStats(tripId);
+    res.json(stats);
   } catch (err) {
     next(err);
   }

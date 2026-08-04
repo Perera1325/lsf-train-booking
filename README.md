@@ -105,3 +105,14 @@ See the commit history for the full progression, but roughly:
 ## Repository
 
 https://github.com/Perera1325/lsf-train-booking
+
+## Screenshots
+
+### Booking flow
+![Booking flow](docs/screenshots/booking-flow.jpeg)
+
+### Seat selection
+![Seat selection](docs/screenshots/seat-selection.jpeg)
+
+### Admin dashboard
+![Admin dashboard](docs/screenshots/admin-stats.jpeg)
